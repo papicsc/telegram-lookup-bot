@@ -72,6 +72,7 @@ def init_database():
         user_id INTEGER,
         payment_id TEXT UNIQUE,
         invoice_id TEXT,
+        invoice_url TEXT,
         amount REAL,
         currency TEXT,
         pay_currency TEXT,
@@ -282,16 +283,16 @@ def get_stats() -> Dict:
 
     return stats
 
-def add_payment(user_id: int, payment_id: str, amount: float, currency: str, credits: int, invoice_id: str = None):
+def add_payment(user_id: int, payment_id: str, amount: float, currency: str, credits: int, invoice_id: str = None, invoice_url: str = None):
     """Add payment record"""
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
         cursor.execute(
-            """INSERT INTO payments (user_id, payment_id, invoice_id, amount, currency, credits, status)
-               VALUES (?, ?, ?, ?, ?, ?, 'waiting')""",
-            (user_id, payment_id, invoice_id, amount, currency, credits)
+            """INSERT INTO payments (user_id, payment_id, invoice_id, invoice_url, amount, currency, credits, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting')""",
+            (user_id, payment_id, invoice_id, invoice_url, amount, currency, credits)
         )
         conn.commit()
         return True
@@ -343,4 +344,29 @@ def get_payment(payment_id: str) -> Optional[Dict]:
 
     if row:
         return dict(row)
+    return None
+
+def get_pending_payment(user_id: int) -> Optional[Dict]:
+    """Get user's pending payment (if any)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Get payments from last hour that are not finished/failed/expired
+    cursor.execute(
+        """SELECT * FROM payments
+           WHERE user_id = ?
+           AND status = 'waiting'
+           AND datetime(created_at) > datetime('now', '-1 hour')
+           ORDER BY created_at DESC
+           LIMIT 1""",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+
+    if row:
+        payment_dict = dict(row)
+        # Add invoice_url if not present
+        if 'invoice_url' not in payment_dict or not payment_dict.get('invoice_url'):
+            payment_dict['invoice_url'] = f"https://nowpayments.io/payment/?iid={payment_dict['payment_id']}"
+        return payment_dict
     return None
