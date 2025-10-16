@@ -80,7 +80,7 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 {'👑 <b>Status:</b> PREMIUM' if user['is_premium'] else ''}
 
-<i>💡 Cada busca custa 1 crédito</i>"""
+<i>💡 Cada download custa 1 crédito</i>"""
 
     await update.message.reply_text(
         message,
