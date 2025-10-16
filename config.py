@@ -5,7 +5,7 @@ load_dotenv()
 
 # Bot Configuration
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-ADMIN_ID = int(os.getenv('ADMIN_ID', '1268314769'))
+ADMIN_ID = int(os.getenv('ADMIN_ID', '8288405144'))
 
 # API Configuration
 API_KEY = os.getenv('API_KEY', 'WCjWLueQo596P03tFr8Q')
