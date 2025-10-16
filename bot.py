@@ -249,12 +249,8 @@ async def tudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Found in cache
         total = int(re.sub(r'\D', '', ap[0].split('_')[1]))
 
-        # Deduct credits
-        is_free = db.deduct_credits(user_id, 1)
+        # Don't deduct credits yet - only when user downloads
         user = db.get_user(user_id)
-
-        # Add to history
-        db.add_search_history(user_id, url, total, 0 if is_free else 1, is_free)
 
         message = config.SEARCH_SUCCESS.format(
             url=url,
@@ -263,6 +259,7 @@ async def tudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             credits=user['credits']
         )
 
+        message += f"\n\n⚠️ <i>Crédito será descontado apenas ao fazer o download</i>"
         message += f"\nFIXO: {ap[0]} | {message_id}"
 
         await context.bot.send_message(
@@ -299,12 +296,8 @@ async def tudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             with open(f'files/{nome}', 'w', encoding='utf-8') as f:
                 f.write(r.text)
 
-            # Deduct credits
-            is_free = db.deduct_credits(user_id, 1)
+            # Don't deduct credits yet - only when user downloads
             user = db.get_user(user_id)
-
-            # Add to history
-            db.add_search_history(user_id, url, total, 0 if is_free else 1, is_free)
 
             message = config.SEARCH_SUCCESS.format(
                 url=url,
@@ -313,6 +306,7 @@ async def tudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 credits=user['credits']
             )
 
+            message += f"\n\n⚠️ <i>Crédito será descontado apenas ao fazer o download</i>"
             message += f"\nFIXO: {nome} | {message_id}"
 
             await context.bot.send_message(
@@ -497,13 +491,40 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.answer("⚠️ VOCÊ NÃO ENVIOU A MENSAGEM", show_alert=True)
                 return
 
+            # Check and deduct credits before download
+            user = db.get_user(user_id)
+            has_free = user['free_searches'] > 0
+            has_credits = user['credits'] > 0
+
+            if not has_free and not has_credits:
+                await query.answer("❌ Sem créditos! Use /comprar para adicionar.", show_alert=True)
+                return
+
+            # Deduct credits
+            is_free = db.deduct_credits(user_id, 1)
+            user = db.get_user(user_id)
+
             try:
                 await query.message.delete()
             except:
-                return
+                pass
 
             file, idm = mtext.split('FIXO: ')[1].split(' | ')
-            mtext = '<b>' + mtext + '\n\nURL:LOGIN:SENHA</b>'
+
+            # Extract URL and total from message for history
+            try:
+                url_match = re.search(r'URL: <code>(.+?)</code>', mtext)
+                total_match = re.search(r'LINHAS / ROWS: <code>([\d,]+)</code>', mtext)
+
+                if url_match and total_match:
+                    url = url_match.group(1)
+                    total = int(total_match.group(1).replace(',', ''))
+                    db.add_search_history(user_id, url, total, 0 if is_free else 1, is_free)
+            except:
+                pass
+
+            credit_info = "🎁 GRÁTIS" if is_free else f"💎 -1 crédito (Saldo: {user['credits']})"
+            mtext = '<b>' + mtext.split('⚠️')[0] + f'\n{credit_info}\n\nURL:LOGIN:SENHA</b>'
 
             padrao = [[InlineKeyboardButton(" DELETA 🚮", callback_data='delete')]]
             enviap = InlineKeyboardMarkup(padrao)
@@ -529,13 +550,40 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.answer("⚠️ VOCÊ NÃO ENVIOU A MENSAGEM", show_alert=True)
                 return
 
+            # Check and deduct credits before download
+            user = db.get_user(user_id)
+            has_free = user['free_searches'] > 0
+            has_credits = user['credits'] > 0
+
+            if not has_free and not has_credits:
+                await query.answer("❌ Sem créditos! Use /comprar para adicionar.", show_alert=True)
+                return
+
+            # Deduct credits
+            is_free = db.deduct_credits(user_id, 1)
+            user = db.get_user(user_id)
+
             try:
                 await query.message.delete()
             except:
                 pass
 
             file, idm = mtext.split('FIXO: ')[1].split(' | ')
-            mtext = '<b>' + mtext + '\n\nLOGIN:SENHA</b>'
+
+            # Extract URL and total from message for history
+            try:
+                url_match = re.search(r'URL: <code>(.+?)</code>', mtext)
+                total_match = re.search(r'LINHAS / ROWS: <code>([\d,]+)</code>', mtext)
+
+                if url_match and total_match:
+                    url = url_match.group(1)
+                    total = int(total_match.group(1).replace(',', ''))
+                    db.add_search_history(user_id, url, total, 0 if is_free else 1, is_free)
+            except:
+                pass
+
+            credit_info = "🎁 GRÁTIS" if is_free else f"💎 -1 crédito (Saldo: {user['credits']})"
+            mtext = '<b>' + mtext.split('⚠️')[0] + f'\n{credit_info}\n\nLOGIN:SENHA</b>'
 
             padrao = [[InlineKeyboardButton(" DELETA 🚮", callback_data='delete')]]
             enviap = InlineKeyboardMarkup(padrao)
