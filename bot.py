@@ -37,20 +37,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         adicionar_bot(id, fname, un)
 
     keyboard = [
-        [InlineKeyboardButton("➕ Me adicione ao seu grupo", url="https://t.me/ULP_Lookup_bot?startgroup=true")]
+        [InlineKeyboardButton("🔍 @ULP_Lookup_bot", url="https://t.me/ULP_Lookup_bot")],
+        [InlineKeyboardButton("📊 @TUDOF_bot", url="https://t.me/TUDOF_bot")],
+        [InlineKeyboardButton("➕ Adicionar ao Grupo", url="https://t.me/ULP_Lookup_bot?startgroup=true")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        """🔍 <b>Comandos disponíveis:\n
-🌐 <code>/url URL</code> - Analisar URL completa
-🔗 <code>/ur URL</code> - Versão curta do comando
-⚡ <code>/u URL</code> - Comando mais rápido
+        f"""👋 <b>Bem-vindo, {fname}!</b>
 
-💬 Ou simplesmente envie qualquer mensagem - Farei uma busca automática!\n
-📝 Qualquer mensagem enviada será usada para busca\n
-Canal: t.me/+ojwDmmrG8zVkMTgx\nGrupo: t.me/+NWG-bwBK_f84NjQx\n
-👥 Quer me usar em um grupo? Me adicione!</b>""",
+🔍 <b>COMANDOS DISPONÍVEIS:</b>
+
+🌐 <code>/url URL</code> - Buscar credenciais
+🔗 <code>/ur URL</code> - Busca rápida
+⚡ <code>/u URL</code> - Busca express
+
+💬 <b>Ou simplesmente envie a URL direto!</b>
+
+━━━━━━━━━━━━━━━━━━━━
+<b>🤖 BOTS ATIVOS:</b>
+
+🔹 @ULP_Lookup_bot - Database permanente
+🔹 @TUDOF_bot - Atualizado semanalmente
+
+━━━━━━━━━━━━━━━━━━━━
+<i>💡 Dica: Envie qualquer URL e farei a busca automaticamente!</i></b>""",
         parse_mode='HTML',
         reply_markup=reply_markup,
         reply_to_message_id=idm
