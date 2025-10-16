@@ -428,12 +428,23 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         package = config.PACKAGE_PRICES[pkg_id]
         total_credits = package['credits'] + package['bonus']
 
-        # Create payment (mock for now)
-        payment = payments.create_mock_payment(user_id, pkg_id)
+        # Create payment via NOWPayments API
+        try:
+            payment = payments.create_payment_for_package(user_id, pkg_id)
+        except Exception as e:
+            print(f"Error creating payment: {e}")
+            payment = None
 
         if not payment:
-            await query.message.edit_text("❌ Erro ao criar pagamento. Tente novamente.")
+            await query.message.edit_text(
+                "❌ Erro ao criar pagamento. Verifique se a API key do NOWPayments está configurada corretamente.\n\n"
+                "Entre em contato com o suporte.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data='buy_credits')]])
+            )
             return
+
+        # Get invoice URL
+        invoice_url = payments.get_payment_link(payment.get('id'))
 
         # Save payment to database
         db.add_payment(
@@ -442,11 +453,12 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
             payment['price_amount'],
             payment['price_currency'].upper(),
             total_credits,
-            payment.get('invoice_id')
+            payment.get('id')
         )
 
         keyboard = [
-            [InlineKeyboardButton("💳 Pagar Agora", url=payment['invoice_url'])],
+            [InlineKeyboardButton("💳 Pagar Agora", url=invoice_url)],
+            [InlineKeyboardButton("🔄 Verificar Pagamento", callback_data=f'check_payment_{payment["id"]}')],
             [InlineKeyboardButton("🔙 Voltar", callback_data='buy_credits')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -454,20 +466,80 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = f"""💳 <b>PAGAMENTO CRIADO</b>
 
 📦 <b>Pacote:</b> {total_credits} créditos
-💰 <b>Valor:</b> ${payment['price_amount']:.2f} USD
+💰 <b>Valor:</b> €{payment['price_amount']:.2f} EUR
 
 🔐 <b>ID do Pagamento:</b>
 <code>{payment['id']}</code>
 
 <b>Instruções:</b>
-1. Clique em "Pagar Agora"
+1. Clique em "💳 Pagar Agora"
 2. Escolha sua criptomoeda preferida
 3. Envie o pagamento
-4. Seus créditos serão adicionados automaticamente!
+4. Clique em "🔄 Verificar Pagamento" após pagar
+5. Seus créditos serão adicionados automaticamente!
 
-⏰ <i>Pagamento válido por 60 minutos</i>"""
+⏰ <i>Pagamento válido por 1 hora</i>"""
 
         await query.message.edit_text(message, parse_mode='HTML', reply_markup=reply_markup)
+        return
+
+    # Check payment status
+    if data.startswith('check_payment_'):
+        invoice_id = data.replace('check_payment_', '')
+
+        try:
+            # Get invoice status from NOWPayments
+            np = payments.NOWPayments()
+            invoice_status = np.get_invoice_status(invoice_id)
+
+            if not invoice_status:
+                await query.answer("❌ Erro ao verificar pagamento. Tente novamente.", show_alert=True)
+                return
+
+            status = invoice_status.get('payment_status', 'waiting')
+
+            if status == 'finished':
+                # Payment completed - update database and add credits
+                payment_data = db.get_payment(invoice_id)
+                if payment_data and payment_data['status'] != 'finished':
+                    db.update_payment_status(invoice_id, 'finished')
+                    db.update_user_credits(user_id, payment_data['credits'])
+
+                    await query.message.edit_text(
+                        f"✅ <b>PAGAMENTO CONFIRMADO!</b>\n\n"
+                        f"💎 <b>{payment_data['credits']} créditos</b> foram adicionados à sua conta!\n\n"
+                        f"Use /saldo para verificar seu saldo.",
+                        parse_mode='HTML'
+                    )
+                else:
+                    await query.answer("✅ Pagamento já processado!", show_alert=True)
+
+            elif status in ['confirming', 'sending', 'partially_paid']:
+                await query.answer(
+                    "⏳ Pagamento em processamento...\n\n"
+                    "Aguarde alguns minutos e clique novamente.",
+                    show_alert=True
+                )
+
+            elif status in ['failed', 'refunded', 'expired']:
+                db.update_payment_status(invoice_id, status)
+                await query.answer(
+                    f"❌ Pagamento {status}.\n\n"
+                    "Entre em contato com o suporte se precisar de ajuda.",
+                    show_alert=True
+                )
+
+            else:  # waiting
+                await query.answer(
+                    "⏰ Aguardando pagamento...\n\n"
+                    "Complete o pagamento e clique novamente.",
+                    show_alert=True
+                )
+
+        except Exception as e:
+            print(f"Error checking payment: {e}")
+            await query.answer("❌ Erro ao verificar pagamento. Tente novamente.", show_alert=True)
+
         return
 
     # Cancel
