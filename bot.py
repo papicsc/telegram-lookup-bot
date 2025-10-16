@@ -425,6 +425,33 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.edit_text("❌ Pacote inválido.")
             return
 
+        # Check if user has pending payment
+        pending_payment = db.get_pending_payment(user_id)
+        if pending_payment:
+            keyboard = [
+                [InlineKeyboardButton("💳 Pagar Pedido Pendente", url=pending_payment['invoice_url'])],
+                [InlineKeyboardButton("🔄 Verificar Pagamento", callback_data=f'check_payment_{pending_payment["payment_id"]}')],
+                [InlineKeyboardButton("🔙 Voltar", callback_data='buy_credits')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.message.edit_text(
+                f"""⚠️ <b>PAGAMENTO PENDENTE</b>
+
+Você já tem um pagamento em andamento:
+
+📦 <b>Pacote:</b> {pending_payment['credits']} créditos
+💰 <b>Valor:</b> €{pending_payment['amount']:.2f} EUR
+🔐 <b>ID:</b> <code>{pending_payment['payment_id']}</code>
+
+<b>Complete este pagamento primeiro ou aguarde expirar (1 hora)</b>
+
+Use "🔄 Verificar Pagamento" após pagar.""",
+                parse_mode='HTML',
+                reply_markup=reply_markup
+            )
+            return
+
         package = config.PACKAGE_PRICES[pkg_id]
         total_credits = package['credits'] + package['bonus']
 
@@ -469,7 +496,8 @@ Entre em contato com o administrador."""
             float(payment['price_amount']),
             str(payment['price_currency']).upper(),
             total_credits,
-            payment.get('id')
+            payment.get('id'),
+            invoice_url
         )
 
         keyboard = [
@@ -504,22 +532,38 @@ Entre em contato com o administrador."""
         invoice_id = data.replace('check_payment_', '')
 
         try:
+            print(f"[DEBUG] Checking payment status for invoice: {invoice_id}")
+
             # Get invoice status from NOWPayments
             np = payments.NOWPayments()
             invoice_status = np.get_invoice_status(invoice_id)
 
+            print(f"[DEBUG] Invoice status response: {invoice_status}")
+
             if not invoice_status:
+                print(f"[ERROR] Failed to get invoice status for {invoice_id}")
                 await query.answer("❌ Erro ao verificar pagamento. Tente novamente.", show_alert=True)
                 return
 
             status = invoice_status.get('payment_status', 'waiting')
+            print(f"[DEBUG] Payment status: {status}")
 
             if status == 'finished':
                 # Payment completed - update database and add credits
                 payment_data = db.get_payment(invoice_id)
+                print(f"[DEBUG] Payment data from DB: {payment_data}")
+
                 if payment_data and payment_data['status'] != 'finished':
+                    print(f"[INFO] Processing payment completion for user {user_id}")
+                    print(f"[INFO] Adding {payment_data['credits']} credits to user {user_id}")
+
+                    # Update payment status FIRST
                     db.update_payment_status(invoice_id, 'finished')
+
+                    # Then add credits
                     db.update_user_credits(user_id, payment_data['credits'])
+
+                    print(f"[SUCCESS] Credits added successfully to user {user_id}")
 
                     await query.message.edit_text(
                         f"✅ <b>PAGAMENTO CONFIRMADO!</b>\n\n"
@@ -528,9 +572,11 @@ Entre em contato com o administrador."""
                         parse_mode='HTML'
                     )
                 else:
+                    print(f"[INFO] Payment already processed for invoice {invoice_id}")
                     await query.answer("✅ Pagamento já processado!", show_alert=True)
 
             elif status in ['confirming', 'sending', 'partially_paid']:
+                print(f"[INFO] Payment {invoice_id} is being processed")
                 await query.answer(
                     "⏳ Pagamento em processamento...\n\n"
                     "Aguarde alguns minutos e clique novamente.",
@@ -538,6 +584,7 @@ Entre em contato com o administrador."""
                 )
 
             elif status in ['failed', 'refunded', 'expired']:
+                print(f"[WARNING] Payment {invoice_id} status: {status}")
                 db.update_payment_status(invoice_id, status)
                 await query.answer(
                     f"❌ Pagamento {status}.\n\n"
@@ -546,6 +593,7 @@ Entre em contato com o administrador."""
                 )
 
             else:  # waiting
+                print(f"[INFO] Payment {invoice_id} is waiting")
                 await query.answer(
                     "⏰ Aguardando pagamento...\n\n"
                     "Complete o pagamento e clique novamente.",
@@ -553,7 +601,9 @@ Entre em contato com o administrador."""
                 )
 
         except Exception as e:
-            print(f"Error checking payment: {e}")
+            print(f"[ERROR] Error checking payment: {e}")
+            import traceback
+            traceback.print_exc()
             await query.answer("❌ Erro ao verificar pagamento. Tente novamente.", show_alert=True)
 
         return
@@ -749,7 +799,7 @@ def main():
 
     print("🤖 Bot Premium rodando...")
     print(f"📊 Admin ID: {config.ADMIN_ID}")
-    print(f"💰 Preço por busca: ${config.PRICE_PER_SEARCH}")
+    print(f"💰 Preço por busca: €{config.PRICE_PER_SEARCH} EUR")
     app.run_polling()
 
 
