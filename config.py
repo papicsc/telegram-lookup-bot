@@ -35,22 +35,32 @@ FREE_SEARCHES_PER_USER = 1  # Apenas 1 busca grátis (download) para novos usuá
 # Messages
 WELCOME_MESSAGE = """👋 <b>Bem-vindo, {name}!</b>
 
+━━━━━━━━━━━━━━━━━━━━
+
 🔍 <b>COMANDOS DISPONÍVEIS:</b>
 
 🌐 <code>/url URL</code> - Buscar credenciais
 🔗 <code>/ur URL</code> - Busca rápida
 ⚡ <code>/u URL</code> - Busca express
+
 💰 <code>/saldo</code> - Ver seu saldo
 💳 <code>/comprar</code> - Comprar créditos
 📊 <code>/historico</code> - Ver histórico
 
+🎁 <code>/referral</code> - Sistema de indicação
+🎟️ <code>/cupom CODIGO</code> - Usar cupom
+
 💬 <b>Ou simplesmente envie a URL direto!</b>
 
 ━━━━━━━━━━━━━━━━━━━━
-💎 <b>Seu saldo: {credits} créditos</b>
-🎁 <b>Buscas grátis restantes: {free_searches}</b>
 
-<i>💡 Dica: Cada download custa 1 crédito!</i>"""
+💎 <b>Seu saldo: {credits} créditos</b>
+🎁 <b>Buscas grátis: {free_searches}</b>
+
+━━━━━━━━━━━━━━━━━━━━
+
+<i>💡 Cada download custa 1 crédito!</i>
+<i>🎁 Indique amigos e ganhe 10% dos depósitos deles!</i>"""
 
 INSUFFICIENT_CREDITS = """⚠️ <b>SALDO INSUFICIENTE</b>
 
