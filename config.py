@@ -30,7 +30,7 @@ PACKAGE_PRICES = {
 # Bot Settings
 MIN_SEARCH_LENGTH = 3
 MAX_URL_LENGTH = 55
-FREE_SEARCHES_PER_USER = 1  # Apenas 1 busca grátis para novos usuários
+FREE_SEARCHES_PER_USER = 1  # Apenas 1 busca grátis (download) para novos usuários
 
 # Messages
 WELCOME_MESSAGE = """👋 <b>Bem-vindo, {name}!</b>
