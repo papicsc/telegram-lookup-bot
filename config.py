@@ -59,7 +59,7 @@ Você precisa de créditos para fazer buscas!
 💰 Saldo atual: <code>{credits}</code> créditos
 💳 Use /comprar para adicionar créditos
 
-<i>💡 Cada download custa 1 crédito (€1.00 EUR)</i>"""
+<i>💡 Cada download custa 1 crédito</i>"""
 
 SEARCH_SUCCESS = """<b>=>
 ☑️  URL: <code>{url}</code>
