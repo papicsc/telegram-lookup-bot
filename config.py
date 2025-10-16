@@ -69,4 +69,5 @@ SEARCH_SUCCESS = """<b>=>
 TEMPO: <code>{time:.2f}s</code>
 
 💰 Saldo atual: <code>{credits}</code> créditos
+🎁 Buscas grátis: <code>{free_searches}</code>
 </b>"""
