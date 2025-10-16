@@ -25,7 +25,7 @@ def init_database():
         nome TEXT,
         user TEXT,
         credits INTEGER DEFAULT 0,
-        free_searches INTEGER DEFAULT 3,
+        free_searches INTEGER DEFAULT 1,
         total_searches INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_search TIMESTAMP,
@@ -99,7 +99,7 @@ def add_user(user_id: int, nome: str, username: str) -> bool:
 
         cursor.execute(
             """INSERT INTO usuarios (id, nome, user, credits, free_searches)
-               VALUES (?, ?, ?, 0, 3)""",
+               VALUES (?, ?, ?, 0, 1)""",
             (user_id, nome, username)
         )
         conn.commit()
