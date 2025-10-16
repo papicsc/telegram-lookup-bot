@@ -1,218 +1,72 @@
-import requests
-import hmac
-import hashlib
-import json
-from datetime import datetime
-from typing import Dict, Optional
-from config import NOWPAYMENTS_API_KEY, NOWPAYMENTS_IPN_SECRET, NOWPAYMENTS_API_URL, PACKAGE_PRICES
+import os
+from dotenv import load_dotenv
 
-class NOWPayments:
-    def __init__(self):
-        self.api_key = NOWPAYMENTS_API_KEY
-        self.ipn_secret = NOWPAYMENTS_IPN_SECRET
-        self.api_url = NOWPAYMENTS_API_URL
-        self.headers = {
-            'x-api-key': self.api_key,
-            'Content-Type': 'application/json'
-        }
+load_dotenv()
 
-    def get_available_currencies(self) -> list:
-        """Get list of available cryptocurrencies"""
-        try:
-            response = requests.get(
-                f"{self.api_url}/currencies",
-                headers=self.headers
-            )
-            if response.status_code == 200:
-                return response.json().get('currencies', [])
-            return []
-        except Exception as e:
-            print(f"Error getting currencies: {e}")
-            return []
+# Bot Configuration
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+ADMIN_ID = int(os.getenv('ADMIN_ID', '1268314769'))
 
-    def get_estimate(self, amount: float, currency_from: str = 'usd', currency_to: str = 'btc') -> Optional[Dict]:
-        """Get estimated price in crypto"""
-        try:
-            response = requests.get(
-                f"{self.api_url}/estimate",
-                params={
-                    'amount': amount,
-                    'currency_from': currency_from,
-                    'currency_to': currency_to
-                },
-                headers=self.headers
-            )
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except Exception as e:
-            print(f"Error getting estimate: {e}")
-            return None
+# API Configuration
+API_KEY = os.getenv('API_KEY', 'WCjWLueQo596P03tFr8Q')
+API_URL = os.getenv('API_URL', 'https://ulpcloud.site/url')
 
-    def create_payment(self,
-                      price_amount: float,
-                      price_currency: str = 'usd',
-                      pay_currency: str = 'btc',
-                      order_id: str = None,
-                      order_description: str = None,
-                      ipn_callback_url: str = None) -> Optional[Dict]:
-        """Create a payment"""
-        try:
-            payload = {
-                'price_amount': price_amount,
-                'price_currency': price_currency,
-                'pay_currency': pay_currency,
-                'order_id': order_id,
-                'order_description': order_description
-            }
+# NOWPayments Configuration
+NOWPAYMENTS_API_KEY = os.getenv('NOWPAYMENTS_API_KEY', '')
+NOWPAYMENTS_IPN_SECRET = os.getenv('NOWPAYMENTS_IPN_SECRET', '')
+NOWPAYMENTS_API_URL = 'https://api.nowpayments.io/v1'
 
-            if ipn_callback_url:
-                payload['ipn_callback_url'] = ipn_callback_url
+# Pricing Configuration (em EUR)
+PRICE_PER_SEARCH = float(os.getenv('PRICE_PER_SEARCH', '1.00'))  # €1.00 por busca
+PRICE_CURRENCY = 'EUR'  # Moeda padrão
 
-            response = requests.post(
-                f"{self.api_url}/payment",
-                json=payload,
-                headers=self.headers
-            )
+PACKAGE_PRICES = {
+    '10': {'credits': 10, 'price': 10.00, 'bonus': 0},      # €10 = 10 buscas
+    '25': {'credits': 25, 'price': 25.00, 'bonus': 0},      # €25 = 25 buscas
+    '50': {'credits': 50, 'price': 50.00, 'bonus': 5},      # €50 = 50 + 5 bônus
+    '100': {'credits': 100, 'price': 100.00, 'bonus': 15},  # €100 = 100 + 15 bônus
+}
 
-            if response.status_code == 200 or response.status_code == 201:
-                return response.json()
-            else:
-                print(f"Payment creation failed: {response.text}")
-                return None
-        except Exception as e:
-            print(f"Error creating payment: {e}")
-            return None
+# Bot Settings
+MIN_SEARCH_LENGTH = 3
+MAX_URL_LENGTH = 55
+FREE_SEARCHES_PER_USER = 1  # Apenas 1 busca grátis para novos usuários
 
-    def create_invoice(self,
-                      price_amount: float,
-                      price_currency: str = 'usd',
-                      order_id: str = None,
-                      order_description: str = None,
-                      ipn_callback_url: str = None,
-                      success_url: str = None,
-                      cancel_url: str = None) -> Optional[Dict]:
-        """Create an invoice (allows user to choose payment method)"""
-        try:
-            payload = {
-                'price_amount': price_amount,
-                'price_currency': price_currency,
-                'order_id': order_id,
-                'order_description': order_description
-            }
+# Messages
+WELCOME_MESSAGE = """👋 <b>Bem-vindo, {name}!</b>
 
-            if ipn_callback_url:
-                payload['ipn_callback_url'] = ipn_callback_url
-            if success_url:
-                payload['success_url'] = success_url
-            if cancel_url:
-                payload['cancel_url'] = cancel_url
+🔍 <b>COMANDOS DISPONÍVEIS:</b>
 
-            response = requests.post(
-                f"{self.api_url}/invoice",
-                json=payload,
-                headers=self.headers
-            )
+🌐 <code>/url URL</code> - Buscar credenciais
+🔗 <code>/ur URL</code> - Busca rápida
+⚡ <code>/u URL</code> - Busca express
+💰 <code>/saldo</code> - Ver seu saldo
+💳 <code>/comprar</code> - Comprar créditos
+📊 <code>/historico</code> - Ver histórico
 
-            if response.status_code == 200 or response.status_code == 201:
-                return response.json()
-            else:
-                print(f"Invoice creation failed: {response.text}")
-                return None
-        except Exception as e:
-            print(f"Error creating invoice: {e}")
-            return None
+💬 <b>Ou simplesmente envie a URL direto!</b>
 
-    def get_payment_status(self, payment_id: str) -> Optional[Dict]:
-        """Get payment status"""
-        try:
-            response = requests.get(
-                f"{self.api_url}/payment/{payment_id}",
-                headers=self.headers
-            )
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except Exception as e:
-            print(f"Error getting payment status: {e}")
-            return None
+━━━━━━━━━━━━━━━━━━━━
+💎 <b>Seu saldo: {credits} créditos</b>
+🎁 <b>Buscas grátis restantes: {free_searches}</b>
 
-    def verify_ipn(self, request_data: dict, signature: str) -> bool:
-        """Verify IPN callback signature"""
-        try:
-            sorted_data = json.dumps(request_data, sort_keys=True, separators=(',', ':'))
-            expected_signature = hmac.new(
-                self.ipn_secret.encode('utf-8'),
-                sorted_data.encode('utf-8'),
-                hashlib.sha512
-            ).hexdigest()
+<i>💡 Dica: Cada busca custa 1 crédito!</i>"""
 
-            return hmac.compare_digest(expected_signature, signature)
-        except Exception as e:
-            print(f"Error verifying IPN: {e}")
-            return False
+INSUFFICIENT_CREDITS = """⚠️ <b>SALDO INSUFICIENTE</b>
 
-    def get_minimum_payment_amount(self, currency: str) -> Optional[float]:
-        """Get minimum payment amount for a currency"""
-        try:
-            response = requests.get(
-                f"{self.api_url}/min-amount",
-                params={'currency_from': 'usd', 'currency_to': currency},
-                headers=self.headers
-            )
-            if response.status_code == 200:
-                return response.json().get('min_amount')
-            return None
-        except Exception as e:
-            print(f"Error getting minimum amount: {e}")
-            return None
+Você precisa de créditos para fazer buscas!
 
+💰 Saldo atual: <code>{credits}</code> créditos
+💳 Use /comprar para adicionar créditos
 
-def create_payment_for_package(user_id: int, package_id: str, pay_currency: str = 'btc') -> Optional[Dict]:
-    """Create payment for a credits package"""
-    if package_id not in PACKAGE_PRICES:
-        return None
+<i>💡 Cada busca custa 1 crédito (€1.00 EUR)</i>"""
 
-    package = PACKAGE_PRICES[package_id]
-    np = NOWPayments()
+SEARCH_SUCCESS = """<b>=>
+☑️  URL: <code>{url}</code>
 
-    order_id = f"user{user_id}_pkg{package_id}_{int(datetime.now().timestamp())}"
-    description = f"{package['credits'] + package['bonus']} créditos ({package['credits']} + {package['bonus']} bônus)"
+🧵  LINHAS / ROWS: <code>{total:,}</code>
 
-    # Create invoice (allows user to choose payment method)
-    result = np.create_invoice(
-        price_amount=package['price'],
-        price_currency='eur',
-        order_id=order_id,
-        order_description=description
-    )
+TEMPO: <code>{time:.2f}s</code>
 
-    return result
-
-
-def get_payment_link(invoice_id: str) -> str:
-    """Get payment link for invoice"""
-    return f"https://nowpayments.io/payment/?iid={invoice_id}"
-
-
-# Mock function for testing without API key
-def create_mock_payment(user_id: int, package_id: str) -> Dict:
-    """Create mock payment for testing"""
-    if package_id not in PACKAGE_PRICES:
-        return None
-
-    package = PACKAGE_PRICES[package_id]
-
-    return {
-        'id': f'MOCK_{user_id}_{package_id}',
-        'invoice_id': f'MOCK_INV_{user_id}_{package_id}',
-        'order_id': f'user{user_id}_pkg{package_id}',
-        'price_amount': package['price'],
-        'price_currency': 'eur',
-        'pay_amount': package['price'],
-        'pay_currency': 'btc',
-        'order_description': f"{package['credits'] + package['bonus']} créditos",
-        'payment_status': 'waiting',
-        'pay_address': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-        'invoice_url': f'https://nowpayments.io/payment/?iid=MOCK_INV_{user_id}_{package_id}'
-    }
+💰 Saldo restante: <code>{credits}</code> créditos
+</b>"""
