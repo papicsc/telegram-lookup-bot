@@ -256,7 +256,8 @@ async def tudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             url=url,
             total=total,
             time=time.time() - now,
-            credits=user['credits']
+            credits=user['credits'],
+            free_searches=user['free_searches']
         )
 
         message += f"\n\n⚠️ <i>Crédito será descontado apenas ao fazer o download</i>"
@@ -303,7 +304,8 @@ async def tudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 url=url,
                 total=total,
                 time=time.time() - now,
-                credits=user['credits']
+                credits=user['credits'],
+                free_searches=user['free_searches']
             )
 
             message += f"\n\n⚠️ <i>Crédito será descontado apenas ao fazer o download</i>"
