@@ -16,6 +16,23 @@ class NOWPayments:
             'Content-Type': 'application/json'
         }
 
+    def get_api_status(self) -> Optional[Dict]:
+        """Get API status to verify connection"""
+        try:
+            response = requests.get(
+                f"{self.api_url}/status",
+                headers=self.headers,
+                timeout=10
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"[ERROR] API status check failed: {response.status_code} - {response.text}")
+                return None
+        except Exception as e:
+            print(f"[ERROR] Error checking API status: {e}")
+            return None
+
     def get_available_currencies(self) -> list:
         """Get list of available cryptocurrencies"""
         try:
@@ -108,19 +125,37 @@ class NOWPayments:
             if cancel_url:
                 payload['cancel_url'] = cancel_url
 
+            print(f"[DEBUG] Sending request to: {self.api_url}/invoice")
+            print(f"[DEBUG] Headers: {self.headers}")
+            print(f"[DEBUG] Payload: {payload}")
+
             response = requests.post(
                 f"{self.api_url}/invoice",
                 json=payload,
-                headers=self.headers
+                headers=self.headers,
+                timeout=30
             )
+
+            print(f"[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response body: {response.text}")
 
             if response.status_code == 200 or response.status_code == 201:
                 return response.json()
             else:
-                print(f"Invoice creation failed: {response.text}")
+                print(f"[ERROR] Invoice creation failed!")
+                print(f"[ERROR] Status: {response.status_code}")
+                print(f"[ERROR] Response: {response.text}")
                 return None
+        except requests.exceptions.Timeout:
+            print(f"[ERROR] Request timeout to NOWPayments API")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Request error: {e}")
+            return None
         except Exception as e:
-            print(f"Error creating invoice: {e}")
+            print(f"[ERROR] Unexpected error creating invoice: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def get_payment_status(self, payment_id: str) -> Optional[Dict]:
@@ -185,13 +220,25 @@ class NOWPayments:
 def create_payment_for_package(user_id: int, package_id: str) -> Optional[Dict]:
     """Create payment for a credits package"""
     if package_id not in PACKAGE_PRICES:
+        print(f"[ERROR] Package {package_id} not found in PACKAGE_PRICES")
         return None
 
     package = PACKAGE_PRICES[package_id]
+
+    print(f"[DEBUG] Package info: {package}")
+    print(f"[DEBUG] API Key: {NOWPAYMENTS_API_KEY[:10]}..." if NOWPAYMENTS_API_KEY else "[ERROR] No API Key!")
+
+    if not NOWPAYMENTS_API_KEY or len(NOWPAYMENTS_API_KEY) < 10:
+        print("[ERROR] NOWPayments API Key is missing or invalid!")
+        return None
+
     np = NOWPayments()
 
     order_id = f"user{user_id}_pkg{package_id}_{int(datetime.now().timestamp())}"
     description = f"{package['credits'] + package['bonus']} créditos"
+
+    print(f"[DEBUG] Creating invoice with order_id: {order_id}")
+    print(f"[DEBUG] Amount: {package['price']} EUR")
 
     # Create invoice (allows user to choose payment method)
     result = np.create_invoice(
@@ -202,9 +249,14 @@ def create_payment_for_package(user_id: int, package_id: str) -> Optional[Dict]:
         success_url=f"https://t.me/YOUR_BOT_USERNAME",  # Redirect após pagamento
     )
 
+    print(f"[DEBUG] Invoice result: {result}")
+
     if result:
-        # Add invoice_url to result
-        result['invoice_url'] = get_payment_link(result.get('id'))
+        # invoice_url already comes in the response from NOWPayments
+        # But add it manually if not present (for backwards compatibility)
+        if 'invoice_url' not in result:
+            result['invoice_url'] = get_payment_link(result.get('id'))
+        print(f"[DEBUG] Invoice URL: {result.get('invoice_url')}")
 
     return result
 
