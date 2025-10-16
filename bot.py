@@ -482,7 +482,7 @@ Entre em contato com o administrador."""
         message = f"""💳 <b>PAGAMENTO CRIADO</b>
 
 📦 <b>Pacote:</b> {total_credits} créditos
-💰 <b>Valor:</b> €{payment['price_amount']:.2f} EUR
+💰 <b>Valor:</b> €{float(payment['price_amount']):.2f} EUR
 
 🔐 <b>ID do Pagamento:</b>
 <code>{payment['id']}</code>
