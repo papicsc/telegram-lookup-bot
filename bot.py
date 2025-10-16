@@ -5,10 +5,13 @@ import os
 import re
 import time
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 import config
 import database as db
 import payments
+import referral_commands
+import admin_commands
+import coupon_commands
 
 # Initialize database
 db.init_database()
@@ -22,12 +25,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fname = info.from_user.first_name
     chat_type = info.chat.type
 
+    # Check rate limit
+    is_blocked, seconds = db.check_rate_limit(user_id)
+    if is_blocked:
+        minutes = seconds // 60
+        await update.message.reply_text(
+            f"⏰ Você está temporariamente bloqueado por {minutes} minutos.\n\n"
+            "Aguarde para usar comandos novamente."
+        )
+        return
+
+    # Check for referral code in start parameter
+    referred_by_code = None
+    if context.args:
+        referred_by_code = context.args[0].strip().upper()
+
     # Add user to database
     if chat_type == 'private':
-        db.add_user(user_id, fname, username)
+        db.add_user(user_id, fname, username, referred_by_code)
 
     # Get user info
     user = db.get_user(user_id)
+
+    # Check if banned
+    if user and user['is_banned']:
+        await update.message.reply_text("🚫 Sua conta está suspensa. Entre em contato com o suporte.")
+        return
+
     credits = user['credits'] if user else 0
     free_searches = user['free_searches'] if user else 0
 
@@ -35,6 +59,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("💰 Comprar Créditos", callback_data='buy_credits'),
             InlineKeyboardButton("📊 Meu Saldo", callback_data='my_balance')
+        ],
+        [
+            InlineKeyboardButton("🎁 Indicar Amigos", callback_data='referral_menu')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -58,25 +85,52 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = update.message if update.message else update.edited_message
     user_id = info.from_user.id
 
+    # Check rate limit
+    is_blocked, seconds = db.check_rate_limit(user_id)
+    if is_blocked:
+        minutes = seconds // 60
+        await update.message.reply_text(f"⏰ Bloqueado por {minutes} minutos.")
+        return
+
     user = db.get_user(user_id)
     if not user:
         await update.message.reply_text("❌ Usuário não encontrado. Use /start primeiro.")
         return
 
+    if user['is_banned']:
+        await update.message.reply_text("🚫 Sua conta está suspensa.")
+        return
+
+    referral_stats = db.get_referral_stats(user_id)
+
     keyboard = [
         [InlineKeyboardButton("💳 Comprar Créditos", callback_data='buy_credits')],
-        [InlineKeyboardButton("📊 Ver Histórico", callback_data='view_history')]
+        [InlineKeyboardButton("📊 Ver Histórico", callback_data='view_history')],
+        [InlineKeyboardButton("🎁 Sistema de Indicação", callback_data='referral_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     message = f"""💰 <b>SEU SALDO</b>
 
+━━━━━━━━━━━━━━━━━━━━
+
 👤 <b>Nome:</b> {user['nome']}
 🆔 <b>ID:</b> <code>{user['id']}</code>
+
+━━━━━━━━━━━━━━━━━━━━
 
 💎 <b>Créditos:</b> <code>{user['credits']}</code>
 🎁 <b>Buscas grátis:</b> <code>{user['free_searches']}</code>
 📊 <b>Total de buscas:</b> <code>{user['total_searches']}</code>
+
+━━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>SISTEMA DE INDICAÇÃO</b>
+
+👥 <b>Indicados:</b> {referral_stats['total_referred']}
+💰 <b>Ganhos:</b> {user['total_referral_earnings']} créditos
+
+━━━━━━━━━━━━━━━━━━━━
 
 {'👑 <b>Status:</b> PREMIUM' if user['is_premium'] else ''}
 
@@ -369,6 +423,74 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
 
+    # Check rate limit (except for admin)
+    if user_id != config.ADMIN_ID:
+        is_blocked, seconds = db.check_rate_limit(user_id)
+        if is_blocked:
+            minutes = seconds // 60
+            await query.answer(f"⏰ Bloqueado por {minutes} minutos", show_alert=True)
+            return
+
+    # Check if banned
+    user = db.get_user(user_id)
+    if user and user['is_banned'] and user_id != config.ADMIN_ID:
+        await query.answer("🚫 Conta suspensa", show_alert=True)
+        return
+
+    # Referral system callbacks
+    if data == 'referral_menu':
+        await referral_commands.referral_menu(update, context)
+        return
+
+    if data == 'view_referred':
+        await referral_commands.view_referred(update, context)
+        return
+
+    if data == 'customize_code':
+        await referral_commands.customize_code_start(update, context)
+        return
+
+    if data == 'back_to_main':
+        await start(update, context)
+        return
+
+    # Admin callbacks
+    if data == 'admin_panel':
+        await admin_commands.admin_panel(update, context)
+        return
+
+    if data == 'admin_search_user':
+        await admin_commands.admin_search_user_start(update, context)
+        return
+
+    if data == 'admin_add_credits':
+        await admin_commands.admin_add_credits_start(update, context)
+        return
+
+    if data == 'admin_remove_credits':
+        await admin_commands.admin_remove_credits_start(update, context)
+        return
+
+    if data == 'admin_toggle_ban':
+        await admin_commands.admin_toggle_ban(update, context)
+        return
+
+    if data == 'admin_coupons':
+        await admin_commands.admin_coupons_menu(update, context)
+        return
+
+    if data == 'admin_create_coupon':
+        await admin_commands.admin_create_coupon_start(update, context)
+        return
+
+    if data == 'admin_blocked_users':
+        await admin_commands.admin_blocked_users(update, context)
+        return
+
+    if data == 'admin_close':
+        await admin_commands.admin_close(update, context)
+        return
+
     # Buy credits menu
     if data == 'buy_credits':
         await comprar(update, context)
@@ -563,14 +685,35 @@ Entre em contato com o administrador."""
                     # Then add credits
                     db.update_user_credits(user_id, payment_data['credits'])
 
+                    # Process referral commission (10%)
+                    db.process_referral_commission(invoice_id, user_id, payment_data['credits'])
+
                     print(f"[SUCCESS] Credits added successfully to user {user_id}")
 
+                    # Notify user
                     await query.message.edit_text(
                         f"✅ <b>PAGAMENTO CONFIRMADO!</b>\n\n"
                         f"💎 <b>{payment_data['credits']} créditos</b> foram adicionados à sua conta!\n\n"
                         f"Use /saldo para verificar seu saldo.",
                         parse_mode='HTML'
                     )
+
+                    # Check if someone referred this user and notify them
+                    user = db.get_user(user_id)
+                    if user and user['referred_by']:
+                        commission = int(payment_data['credits'] * 0.1)
+                        if commission >= 1:
+                            try:
+                                await context.bot.send_message(
+                                    chat_id=user['referred_by'],
+                                    text=f"🎁 <b>COMISSÃO RECEBIDA!</b>\n\n"
+                                         f"Seu indicado acabou de depositar créditos!\n\n"
+                                         f"💎 <b>Você ganhou: {commission} créditos</b>\n\n"
+                                         f"Use /referral para ver suas estatísticas.",
+                                    parse_mode='HTML'
+                                )
+                            except:
+                                pass
                 else:
                     print(f"[INFO] Payment already processed for invoice {invoice_id}")
                     await query.answer("✅ Pagamento já processado!", show_alert=True)
@@ -770,6 +913,32 @@ Entre em contato com o administrador."""
         print(f"Error in button handler: {e}")
 
 
+async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle all text messages"""
+    # Check if awaiting input for referral code
+    if context.user_data.get('awaiting_referral_code'):
+        await referral_commands.process_custom_code(update, context)
+        return
+
+    # Check if awaiting input for admin user search
+    if context.user_data.get('awaiting_user_id'):
+        await admin_commands.admin_process_user_search(update, context)
+        return
+
+    # Check if awaiting credits adjustment
+    if context.user_data.get('awaiting_credits_amount'):
+        await admin_commands.admin_process_credits_adjustment(update, context)
+        return
+
+    # Check if awaiting coupon creation
+    if context.user_data.get('awaiting_coupon_data'):
+        await admin_commands.admin_process_coupon_creation(update, context)
+        return
+
+    # Otherwise, treat as search command
+    await tudo(update, context)
+
+
 def main():
     if not config.BOT_TOKEN:
         print('❌ BOT_TOKEN não encontrado!')
@@ -788,11 +957,19 @@ def main():
     app.add_handler(CommandHandler("historico", historico))
     app.add_handler(CommandHandler("stats", admin_stats))
 
+    # New command handlers
+    app.add_handler(CommandHandler("referral", referral_commands.referral_menu))
+    app.add_handler(CommandHandler("meusindicados", referral_commands.view_referred))
+    app.add_handler(CommandHandler("cupom", coupon_commands.use_coupon_command))
+    app.add_handler(CommandHandler("admin", admin_commands.admin_panel))
+
     # Search handlers
     app.add_handler(CommandHandler("url", tudo))
     app.add_handler(CommandHandler("ur", tudo))
     app.add_handler(CommandHandler("u", tudo))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, tudo))
+
+    # Message handler (must be last)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
 
     # Callback handler
     app.add_handler(CallbackQueryHandler(Botoes))
@@ -800,6 +977,10 @@ def main():
     print("🤖 Bot Premium rodando...")
     print(f"📊 Admin ID: {config.ADMIN_ID}")
     print(f"💰 Preço por busca: €{config.PRICE_PER_SEARCH} EUR")
+    print(f"✅ SQLite: Conectado (Bot_premium.db)")
+    print(f"🎁 Sistema de Referral: Ativo")
+    print(f"🎟️ Sistema de Cupons: Ativo")
+    print(f"🚫 Anti-Spam: Ativo")
     app.run_polling()
 
 
