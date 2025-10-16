@@ -50,7 +50,7 @@ WELCOME_MESSAGE = """👋 <b>Bem-vindo, {name}!</b>
 💎 <b>Seu saldo: {credits} créditos</b>
 🎁 <b>Buscas grátis restantes: {free_searches}</b>
 
-<i>💡 Dica: Cada busca custa 1 crédito!</i>"""
+<i>💡 Dica: Cada download custa 1 crédito!</i>"""
 
 INSUFFICIENT_CREDITS = """⚠️ <b>SALDO INSUFICIENTE</b>
 
@@ -59,7 +59,7 @@ Você precisa de créditos para fazer buscas!
 💰 Saldo atual: <code>{credits}</code> créditos
 💳 Use /comprar para adicionar créditos
 
-<i>💡 Cada busca custa 1 crédito (€1.00 EUR)</i>"""
+<i>💡 Cada download custa 1 crédito (€1.00 EUR)</i>"""
 
 SEARCH_SUCCESS = """<b>=>
 ☑️  URL: <code>{url}</code>
@@ -68,5 +68,5 @@ SEARCH_SUCCESS = """<b>=>
 
 TEMPO: <code>{time:.2f}s</code>
 
-💰 Saldo restante: <code>{credits}</code> créditos
+💰 Saldo atual: <code>{credits}</code> créditos
 </b>"""
