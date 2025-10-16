@@ -430,28 +430,44 @@ async def Botoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Create payment via NOWPayments API
         try:
+            print(f"[DEBUG] Creating payment for user {user_id}, package {pkg_id}")
             payment = payments.create_payment_for_package(user_id, pkg_id)
+            print(f"[DEBUG] Payment result: {payment}")
         except Exception as e:
-            print(f"Error creating payment: {e}")
+            print(f"[ERROR] Error creating payment: {e}")
+            import traceback
+            traceback.print_exc()
             payment = None
 
         if not payment:
+            error_msg = f"""❌ <b>ERRO AO CRIAR PAGAMENTO</b>
+
+Possíveis causas:
+• API key do NOWPayments inválida
+• Problema de conexão com NOWPayments
+• Configuração incorreta
+
+<b>Detalhes técnicos:</b>
+API Key configurada: {'✅ Sim' if config.NOWPAYMENTS_API_KEY else '❌ Não'}
+
+Entre em contato com o administrador."""
+
             await query.message.edit_text(
-                "❌ Erro ao criar pagamento. Verifique se a API key do NOWPayments está configurada corretamente.\n\n"
-                "Entre em contato com o suporte.",
+                error_msg,
+                parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data='buy_credits')]])
             )
             return
 
-        # Get invoice URL
-        invoice_url = payments.get_payment_link(payment.get('id'))
+        # Get invoice URL from payment response (NOWPayments returns it directly)
+        invoice_url = payment.get('invoice_url') or payments.get_payment_link(payment.get('id'))
 
         # Save payment to database
         db.add_payment(
             user_id,
             payment['id'],
-            payment['price_amount'],
-            payment['price_currency'].upper(),
+            float(payment['price_amount']),
+            str(payment['price_currency']).upper(),
             total_credits,
             payment.get('id')
         )
