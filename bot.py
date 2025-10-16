@@ -32,13 +32,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     free_searches = user['free_searches'] if user else 0
 
     keyboard = [
-        [InlineKeyboardButton("🔍 @ULP_Lookup_bot", url="https://t.me/ULP_Lookup_bot")],
-        [InlineKeyboardButton("📊 @TUDOF_bot", url="https://t.me/TUDOF_bot")],
         [
             InlineKeyboardButton("💰 Comprar Créditos", callback_data='buy_credits'),
             InlineKeyboardButton("📊 Meu Saldo", callback_data='my_balance')
-        ],
-        [InlineKeyboardButton("➕ Adicionar ao Grupo", url="https://t.me/ULP_Lookup_bot?startgroup=true")]
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
