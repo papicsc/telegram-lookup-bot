@@ -939,6 +939,45 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await tudo(update, context)
 
 
+async def setup_bot_commands(application: Application):
+    """Setup bot commands for users and admin"""
+    from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+
+    # Commands for regular users
+    user_commands = [
+        BotCommand("start", "Iniciar o bot"),
+        BotCommand("saldo", "Ver seu saldo e estatísticas"),
+        BotCommand("comprar", "Comprar créditos"),
+        BotCommand("historico", "Ver histórico de buscas"),
+        BotCommand("referral", "Sistema de indicação"),
+        BotCommand("meusindicados", "Ver seus indicados"),
+        BotCommand("cupom", "Usar um cupom"),
+        BotCommand("url", "Buscar credenciais por URL"),
+    ]
+
+    # Commands for admin (all user commands + admin commands)
+    admin_commands = user_commands + [
+        BotCommand("admin", "Painel administrativo"),
+        BotCommand("stats", "Estatísticas do bot"),
+    ]
+
+    try:
+        # Set default commands for all users
+        await application.bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
+
+        # Set admin commands for admin user
+        await application.bot.set_my_commands(
+            admin_commands,
+            scope=BotCommandScopeChat(chat_id=config.ADMIN_ID)
+        )
+
+        print("✅ Comandos do bot configurados com sucesso!")
+        print(f"   • Usuários: {len(user_commands)} comandos")
+        print(f"   • Admin (ID {config.ADMIN_ID}): {len(admin_commands)} comandos")
+    except Exception as e:
+        print(f"⚠️ Erro ao configurar comandos: {e}")
+
+
 def main():
     if not config.BOT_TOKEN:
         print('❌ BOT_TOKEN não encontrado!')
@@ -981,6 +1020,14 @@ def main():
     print(f"🎁 Sistema de Referral: Ativo")
     print(f"🎟️ Sistema de Cupons: Ativo")
     print(f"🚫 Anti-Spam: Ativo")
+    print("")
+
+    # Setup commands on startup
+    async def post_init(application: Application):
+        await setup_bot_commands(application)
+
+    app.post_init = post_init
+
     app.run_polling()
 
 
