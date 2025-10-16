@@ -2,6 +2,7 @@ import requests
 import hmac
 import hashlib
 import json
+from datetime import datetime
 from typing import Dict, Optional
 from config import NOWPAYMENTS_API_KEY, NOWPAYMENTS_IPN_SECRET, NOWPAYMENTS_API_URL, PACKAGE_PRICES
 
@@ -181,7 +182,7 @@ def create_payment_for_package(user_id: int, package_id: str, pay_currency: str 
     # Create invoice (allows user to choose payment method)
     result = np.create_invoice(
         price_amount=package['price'],
-        price_currency='usd',
+        price_currency='eur',
         order_id=order_id,
         order_description=description
     )
@@ -207,7 +208,7 @@ def create_mock_payment(user_id: int, package_id: str) -> Dict:
         'invoice_id': f'MOCK_INV_{user_id}_{package_id}',
         'order_id': f'user{user_id}_pkg{package_id}',
         'price_amount': package['price'],
-        'price_currency': 'usd',
+        'price_currency': 'eur',
         'pay_amount': package['price'],
         'pay_currency': 'btc',
         'order_description': f"{package['credits'] + package['bonus']} créditos",
