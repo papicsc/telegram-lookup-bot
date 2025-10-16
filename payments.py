@@ -137,6 +137,20 @@ class NOWPayments:
             print(f"Error getting payment status: {e}")
             return None
 
+    def get_invoice_status(self, invoice_id: str) -> Optional[Dict]:
+        """Get invoice status"""
+        try:
+            response = requests.get(
+                f"{self.api_url}/invoice/{invoice_id}",
+                headers=self.headers
+            )
+            if response.status_code == 200:
+                return response.json()
+            return None
+        except Exception as e:
+            print(f"Error getting invoice status: {e}")
+            return None
+
     def verify_ipn(self, request_data: dict, signature: str) -> bool:
         """Verify IPN callback signature"""
         try:
@@ -168,7 +182,7 @@ class NOWPayments:
             return None
 
 
-def create_payment_for_package(user_id: int, package_id: str, pay_currency: str = 'btc') -> Optional[Dict]:
+def create_payment_for_package(user_id: int, package_id: str) -> Optional[Dict]:
     """Create payment for a credits package"""
     if package_id not in PACKAGE_PRICES:
         return None
@@ -177,15 +191,20 @@ def create_payment_for_package(user_id: int, package_id: str, pay_currency: str 
     np = NOWPayments()
 
     order_id = f"user{user_id}_pkg{package_id}_{int(datetime.now().timestamp())}"
-    description = f"{package['credits'] + package['bonus']} créditos ({package['credits']} + {package['bonus']} bônus)"
+    description = f"{package['credits'] + package['bonus']} créditos"
 
     # Create invoice (allows user to choose payment method)
     result = np.create_invoice(
         price_amount=package['price'],
         price_currency='eur',
         order_id=order_id,
-        order_description=description
+        order_description=description,
+        success_url=f"https://t.me/YOUR_BOT_USERNAME",  # Redirect após pagamento
     )
+
+    if result:
+        # Add invoice_url to result
+        result['invoice_url'] = get_payment_link(result.get('id'))
 
     return result
 
@@ -195,24 +214,7 @@ def get_payment_link(invoice_id: str) -> str:
     return f"https://nowpayments.io/payment/?iid={invoice_id}"
 
 
-# Mock function for testing without API key
-def create_mock_payment(user_id: int, package_id: str) -> Dict:
-    """Create mock payment for testing"""
-    if package_id not in PACKAGE_PRICES:
-        return None
-
-    package = PACKAGE_PRICES[package_id]
-
-    return {
-        'id': f'MOCK_{user_id}_{package_id}',
-        'invoice_id': f'MOCK_INV_{user_id}_{package_id}',
-        'order_id': f'user{user_id}_pkg{package_id}',
-        'price_amount': package['price'],
-        'price_currency': 'eur',
-        'pay_amount': package['price'],
-        'pay_currency': 'btc',
-        'order_description': f"{package['credits'] + package['bonus']} créditos",
-        'payment_status': 'waiting',
-        'pay_address': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-        'invoice_url': f'https://nowpayments.io/payment/?iid=MOCK_INV_{user_id}_{package_id}'
-    }
+def check_payment_status(payment_id: str) -> Optional[Dict]:
+    """Check payment status"""
+    np = NOWPayments()
+    return np.get_payment_status(payment_id)
